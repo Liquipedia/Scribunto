@@ -103,23 +103,10 @@ class ScribuntoHooks {
 			$engine = Scribunto::getParserEngine( $parser );
 
 			$title = Title::makeTitleSafe( NS_MODULE, $moduleName );
-
-			# CORE HACK START
-			$newTitle = clone $title;
-#			if( ExtensionRegistry::getInstance()->isLoaded( 'GlobalTransclude' ) && !$title->exists() ) {
-			if( !$title->exists() ) {
-				global $wgGlobalTranscludeWikiID;
-				$dbr = wfGetDB( DB_REPLICA, [], $wgGlobalTranscludeWikiID );
-				$row = $dbr->selectRow( 'page', '*', ['page_title' => $title->getDBkey(), 'page_namespace' => $title->getNamespace()], __METHOD__, [] );
-				$newTitle->loadFromRow( $row );
-			}
-
-			if ( !$title || !$title->hasContentModel( CONTENT_MODEL_SCRIBUNTO ) || !$newTitle || !$newTitle->hasContentModel( CONTENT_MODEL_SCRIBUNTO ) ) {
+			if ( !$title || !$title->hasContentModel( CONTENT_MODEL_SCRIBUNTO ) ) {
 				throw new ScribuntoException( 'scribunto-common-nosuchmodule',
 					[ 'args' => [ $moduleName ] ] );
 			}
-			# CORE HACK END
-
 			$module = $engine->fetchModuleFromParser( $title );
 			if ( !$module ) {
 				throw new ScribuntoException( 'scribunto-common-nosuchmodule',
