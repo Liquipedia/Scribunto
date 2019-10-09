@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Wikitext scripting infrastructure for MediaWiki: hooks.
  * Copyright (C) 2009-2012 Victor Vasiliev <vasilvv@gmail.com>
@@ -19,7 +20,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  * http://www.gnu.org/copyleft/gpl.html
  */
-
 use MediaWiki\MediaWikiServices;
 use UtfNormal\Validator;
 use Wikimedia\PSquare;
@@ -99,29 +99,41 @@ class ScribuntoHooks {
 			if ( count( $args ) < 2 ) {
 				throw new ScribuntoException( 'scribunto-common-nofunction' );
 			}
-			$moduleName = trim( $frame->expand( $args[0] ) );
+			$moduleName = trim( $frame->expand( $args[ 0 ] ) );
 			$engine = Scribunto::getParserEngine( $parser );
 
 			$title = Title::makeTitleSafe( NS_MODULE, $moduleName );
-			if ( !$title || !$title->hasContentModel( CONTENT_MODEL_SCRIBUNTO ) ) {
+
+			# CORE HACK START
+			$newTitle = clone $title;
+#			if( ExtensionRegistry::getInstance()->isLoaded( 'GlobalTransclude' ) && !$title->exists() ) {
+			if ( !$title->exists() ) {
+				global $wgGlobalTranscludeWikiID;
+				$dbr = wfGetDB( DB_REPLICA, [], $wgGlobalTranscludeWikiID );
+				$row = $dbr->selectRow( 'page', '*', [ 'page_title' => $title->getDBkey(), 'page_namespace' => $title->getNamespace() ], __METHOD__, [] );
+				$newTitle->loadFromRow( $row );
+			}
+			if ( !$title || !$title->hasContentModel( CONTENT_MODEL_SCRIBUNTO ) || !$newTitle || !$newTitle->hasContentModel( CONTENT_MODEL_SCRIBUNTO ) ) {
 				throw new ScribuntoException( 'scribunto-common-nosuchmodule',
 					[ 'args' => [ $moduleName ] ] );
 			}
+			# CORE HACK END
+
 			$module = $engine->fetchModuleFromParser( $title );
 			if ( !$module ) {
 				throw new ScribuntoException( 'scribunto-common-nosuchmodule',
 					[ 'args' => [ $moduleName ] ] );
 			}
-			$functionName = trim( $frame->expand( $args[1] ) );
+			$functionName = trim( $frame->expand( $args[ 1 ] ) );
 
-			$bits = $args[1]->splitArg();
-			unset( $args[0] );
-			unset( $args[1] );
+			$bits = $args[ 1 ]->splitArg();
+			unset( $args[ 0 ] );
+			unset( $args[ 1 ] );
 
 			// If $bits['index'] is empty, then the function name was parsed as a
 			// key=value pair (because of an equals sign in it), and since it didn't
 			// have an index, we don't need the index offset.
-			$childFrame = $frame->newChild( $args, $title, $bits['index'] === '' ? 0 : 1 );
+			$childFrame = $frame->newChild( $args, $title, $bits[ 'index' ] === '' ? 0 : 1 );
 
 			if ( $wgScribuntoGatherFunctionStats ) {
 				$u0 = $engine->getResourceUsage( $engine::CPU_SECONDS );
@@ -129,7 +141,7 @@ class ScribuntoHooks {
 				$u1 = $engine->getResourceUsage( $engine::CPU_SECONDS );
 
 				if ( $u1 > $u0 ) {
-					$timingMs = (int)( 1000 * ( $u1 - $u0 ) );
+					$timingMs = (int) ( 1000 * ( $u1 - $u0 ) );
 					// Since the overhead of stats is worst when when #invoke
 					// calls are very short, don't process measurements <= 20ms.
 					if ( $timingMs > 20 ) {
@@ -146,13 +158,13 @@ class ScribuntoHooks {
 			$html = Html::element( 'p', [], $e->getMessage() );
 			if ( $trace !== false ) {
 				$html .= Html::element( 'p',
-					[],
-					wfMessage( 'scribunto-common-backtrace' )->inContentLanguage()->text()
-				) . $trace;
+						[],
+						wfMessage( 'scribunto-common-backtrace' )->inContentLanguage()->text()
+					) . $trace;
 			} else {
 				$html .= Html::element( 'p',
-					[],
-					wfMessage( 'scribunto-common-no-details' )->inContentLanguage()->text()
+						[],
+						wfMessage( 'scribunto-common-no-details' )->inContentLanguage()->text()
 				);
 			}
 			$out = $parser->getOutput();
@@ -171,7 +183,7 @@ class ScribuntoHooks {
 
 			// #iferror-compatible error element
 			return "<strong class=\"error\"><span class=\"scribunto-error\" id=\"$id\">" .
-				$parserError. "</span></strong>";
+				$parserError . "</span></strong>";
 		}
 	}
 
@@ -198,7 +210,6 @@ class ScribuntoHooks {
 
 		if ( !$cache ) {
 			$cache = ObjectCache::getLocalServerInstance( CACHE_NONE );
-
 		}
 
 		// To control the sampling rate, we keep a compact histogram of
@@ -339,7 +350,7 @@ class ScribuntoHooks {
 	 */
 	public static function beforeEditButtons( EditPage &$editor, array &$buttons, &$tabindex ) {
 		if ( $editor->getTitle()->hasContentModel( CONTENT_MODEL_SCRIBUNTO ) ) {
-			unset( $buttons['preview'] );
+			unset( $buttons[ 'preview' ] );
 		}
 		return true;
 	}
@@ -367,9 +378,9 @@ class ScribuntoHooks {
 
 		$status->merge( $validateStatus );
 
-		if ( isset( $validateStatus->scribunto_error->params['module'] ) ) {
-			$module = $validateStatus->scribunto_error->params['module'];
-			$line = $validateStatus->scribunto_error->params['line'];
+		if ( isset( $validateStatus->scribunto_error->params[ 'module' ] ) ) {
+			$module = $validateStatus->scribunto_error->params[ 'module' ];
+			$line = $validateStatus->scribunto_error->params[ 'line' ];
 			if ( $module === $title->getPrefixedDBkey() && preg_match( '/^\d+$/', $line ) ) {
 				$out = $context->getOutput();
 				$out->addInlineScript( 'window.location.hash = ' . Xml::encodeJsVar( "#mw-ce-l$line" ) );
@@ -394,4 +405,5 @@ class ScribuntoHooks {
 		}
 		return true;
 	}
+
 }
